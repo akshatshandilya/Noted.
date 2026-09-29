@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/date_format.dart';
@@ -21,28 +23,40 @@ class NoteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final tone = parseNoteColor(note.color);
     final fg = tone != null ? kInkOnPastel : scheme.onSurface;
     final sub = tone != null ? kInkOnPastel.withOpacity(0.6) : scheme.onSurfaceVariant;
     final total = note.checklist.length;
     final done = note.checklistDone;
     final isChecklist = note.type == NoteType.checklist && total > 0;
+    final isDrawing = note.type == NoteType.drawing;
+    const radius = 10.0;
 
     return Semantics(
       button: true,
       label: '${note.title.isEmpty ? 'Untitled' : note.title}. Double tap to open.',
       child: Material(
-        color: tone ?? scheme.surface,
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(radius),
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(radius),
           onTap: onTap,
           onLongPress: onLongPress,
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              color: tone ?? scheme.surface,
+              borderRadius: BorderRadius.circular(radius),
               border: Border.all(color: scheme.outline),
+              // The "sticker" offset shadow from the design, not a soft blur.
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.6 : 0.08),
+                  offset: const Offset(3, 3),
+                  blurRadius: 0,
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,26 +68,28 @@ class NoteCard extends StatelessWidget {
                         note.title.isEmpty ? 'Untitled' : note.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AppTheme.display(17, color: fg),
+                        style: AppTheme.display(15, color: fg).copyWith(fontWeight: FontWeight.w600),
                       ),
                     ),
-                    if (note.pinned) Icon(Icons.push_pin, size: 14, color: sub),
+                    if (note.pinned) Icon(Icons.push_pin, size: 13, color: sub),
                     if (note.favorite) ...[
                       const SizedBox(width: 4),
-                      Icon(Icons.star, size: 14, color: sub),
+                      Icon(Icons.star, size: 13, color: sub),
                     ],
                   ],
                 ),
                 const SizedBox(height: 6),
                 Expanded(
-                  child: isChecklist
-                      ? _ChecklistPreview(note: note, fg: fg, sub: sub)
-                      : Text(
-                          note.content.trim().isEmpty ? 'No content' : note.content.trim(),
-                          maxLines: compact ? 2 : 4,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13.5, height: 1.35, color: sub),
-                        ),
+                  child: isDrawing
+                      ? _DrawingPreview(note: note, sub: sub)
+                      : isChecklist
+                          ? _ChecklistPreview(note: note, fg: fg, sub: sub)
+                          : Text(
+                              note.content.trim().isEmpty ? 'No content' : note.content.trim(),
+                              maxLines: compact ? 2 : 4,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 13, height: 1.4, color: sub),
+                            ),
                 ),
                 if (isChecklist) ...[
                   ClipRRect(
@@ -91,7 +107,7 @@ class NoteCard extends StatelessWidget {
                   children: [
                     Text(
                       isChecklist ? '$done/$total completed' : formatNoteDate(note.updatedAt),
-                      style: TextStyle(fontSize: 11.5, color: sub),
+                      style: TextStyle(fontSize: 11, color: sub),
                     ),
                     const Spacer(),
                     if (note.tags.isNotEmpty)
@@ -100,7 +116,7 @@ class NoteCard extends StatelessWidget {
                           '#${note.tags.first}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11.5, color: sub),
+                          style: TextStyle(fontSize: 11, color: sub),
                         ),
                       ),
                   ],
@@ -109,6 +125,28 @@ class NoteCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DrawingPreview extends StatelessWidget {
+  final Note note;
+  final Color sub;
+  const _DrawingPreview({required this.note, required this.sub});
+
+  @override
+  Widget build(BuildContext context) {
+    final data = note.drawingData;
+    if (data == null || data.isEmpty) {
+      return Text('Empty sketch', style: TextStyle(fontSize: 13, color: sub));
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        color: Colors.white,
+        width: double.infinity,
+        child: Image.memory(base64Decode(data), fit: BoxFit.cover),
       ),
     );
   }
@@ -133,7 +171,7 @@ class _ChecklistPreview extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: 13,
                 color: c.done ? sub : fg,
                 decoration: c.done ? TextDecoration.lineThrough : null,
               ),

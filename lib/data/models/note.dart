@@ -36,6 +36,7 @@ class Note {
   bool deleted;
   final int createdAt;
   int updatedAt;
+  String? drawingData; // base64 PNG snapshot, only used when type == drawing
 
   Note({
     String? id,
@@ -49,6 +50,7 @@ class Note {
     this.favorite = false,
     this.archived = false,
     this.deleted = false,
+    this.drawingData,
     int? createdAt,
     int? updatedAt,
   })  : id = id ?? const Uuid().v4(),
@@ -71,6 +73,7 @@ class Note {
         'favorite': favorite,
         'archived': archived,
         'deleted': deleted,
+        'drawingData': drawingData,
         'createdAt': createdAt,
         'updatedAt': updatedAt,
       };
@@ -92,6 +95,7 @@ class Note {
         favorite: (map['favorite'] ?? false) as bool,
         archived: (map['archived'] ?? false) as bool,
         deleted: (map['deleted'] ?? false) as bool,
+        drawingData: map['drawingData'] as String?,
         createdAt: map['createdAt'] as int?,
         updatedAt: map['updatedAt'] as int?,
       );

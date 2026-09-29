@@ -95,6 +95,25 @@ class NotesProvider extends ChangeNotifier {
     return note;
   }
 
+  /// Creates a note pre-filled from a template (title + body, or an empty
+  /// checklist for list-style templates).
+  Future<Note> createFromTemplate({
+    required String title,
+    String body = '',
+    bool checklist = false,
+  }) async {
+    final note = Note(
+      title: title,
+      content: checklist ? '' : body,
+      type: checklist ? NoteType.checklist : NoteType.note,
+      checklist: checklist ? [ChecklistItem()] : [],
+    );
+    _notes.insert(0, note);
+    await repository.save(note);
+    notifyListeners();
+    return note;
+  }
+
   Future<void> updateNote(Note note) async {
     note.updatedAt = DateTime.now().millisecondsSinceEpoch;
     await repository.save(note);

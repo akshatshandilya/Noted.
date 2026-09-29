@@ -7,9 +7,26 @@ import '../../data/models/note.dart';
 import '../../providers/notes_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/gradient_fab.dart';
 import '../../widgets/note_card.dart';
 import '../../widgets/wordmark.dart';
 import '../editor/note_editor_screen.dart';
+
+class _Template {
+  final String title;
+  final String body;
+  final bool checklist;
+  const _Template(this.title, this.body, {this.checklist = false});
+}
+
+// Matches the "Note Templates" set from the original spec.
+const _templates = [
+  _Template('Daily Journal', "Mood:\n\nToday's highlights:\n\nWhat I learned:\n\nTomorrow's goal:"),
+  _Template('Meeting Notes', 'Meeting:\n\nDate:\n\nAttendees:\n\nDiscussion:\n\nAction Items:'),
+  _Template('Shopping List', '', checklist: true),
+  _Template('Project Ideas', 'Idea:\n\nProblem:\n\nSolution:\n\nFeatures:'),
+  _Template('Study Notes', 'Topic:\n\nKey concepts:\n\nImportant points:\n\nQuestions:'),
+];
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -63,6 +80,25 @@ class _HomeScreenState extends State<HomeScreen> {
       ));
   }
 
+  Widget _createTile(BuildContext ctx, {required IconData icon, required String label, required VoidCallback onTap}) {
+    final scheme = Theme.of(ctx).colorScheme;
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).scaffoldBackgroundColor,
+          shape: BoxShape.circle,
+          border: Border.all(color: scheme.outline),
+        ),
+        child: Icon(icon, size: 17, color: scheme.onSurface),
+      ),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+    );
+  }
+
   void _showCreateSheet() {
     showModalBottomSheet(
       context: context,
@@ -71,27 +107,83 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('New note'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _create(NoteType.note);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.checklist_rtl),
-              title: const Text('Checklist'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _create(NoteType.checklist);
-              },
-            ),
+            _createTile(ctx,
+                icon: Icons.dashboard_customize_outlined,
+                label: 'Templates',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showTemplatesSheet();
+                }),
+            _createTile(ctx,
+                icon: Icons.checklist_rtl,
+                label: 'Checklist',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _create(NoteType.checklist);
+                }),
+            _createTile(ctx,
+                icon: Icons.edit_outlined,
+                label: 'Drawing',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _create(NoteType.drawing);
+                }),
+            _createTile(ctx,
+                icon: Icons.note_add_outlined,
+                label: 'New note',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _create(NoteType.note);
+                }),
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
+  }
+
+  void _showTemplatesSheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Text('Templates',
+                  style: AppTheme.display(20, color: Theme.of(ctx).colorScheme.onSurface)),
+            ),
+            for (final t in _templates)
+              ListTile(
+                title: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  t.checklist ? 'Checklist' : t.body.split('\n').first,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _createFromTemplate(t);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createFromTemplate(_Template t) async {
+    final note = await context.read<NotesProvider>().createFromTemplate(
+          title: t.title,
+          body: t.body,
+          checklist: t.checklist,
+        );
+    if (!mounted) return;
+    _openEditor(note);
   }
 
   void _showNoteMenu(Note note) {
@@ -204,13 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final notes = provider.visible();
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateSheet,
-        icon: const Icon(Icons.add),
-        label: const Text('New'),
-        backgroundColor: scheme.onSurface,
-        foregroundColor: scheme.surface,
-      ),
+      floatingActionButton: GradientFab(onTap: _showCreateSheet),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,6 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: Text(f.$2),
                         selected: provider.filter == f.$1,
                         showCheckmark: false,
+                        shape: const StadiumBorder(),
                         selectedColor: scheme.onSurface,
                         backgroundColor: scheme.surface,
                         side: BorderSide(color: scheme.outline),
@@ -468,6 +555,15 @@ class _SettingsSheet extends StatelessWidget {
                   ChoiceChip(
                     label: Text(s.$2),
                     selected: notes.sort == s.$1,
+                    showCheckmark: false,
+                    shape: const StadiumBorder(),
+                    selectedColor: scheme.onSurface,
+                    backgroundColor: scheme.surface,
+                    side: BorderSide(color: scheme.outline),
+                    labelStyle: TextStyle(
+                      color: notes.sort == s.$1 ? scheme.surface : scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
                     onSelected: (_) => notes.setSort(s.$1),
                   ),
               ],

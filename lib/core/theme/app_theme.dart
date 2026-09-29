@@ -25,24 +25,22 @@ class AppTheme {
   static ThemeData _build(Brightness brightness) {
     final isLight = brightness == Brightness.light;
     final base = isLight ? ThemeData.light(useMaterial3: true) : ThemeData.dark(useMaterial3: true);
+    final primary = isLight ? const Color(0xFF2C4A8C) : const Color(0xFF7B9CF0);
 
-    final scheme = isLight
-        ? const ColorScheme.light(
-            primary: Color(0xFF2C4A8C),
-            onPrimary: Colors.white,
-            surface: Colors.white,
-            onSurface: Color(0xFF1C1B1A),
-            outline: Color(0xFFE7E3DB),
-            onSurfaceVariant: Color(0xFF7A756E),
-          )
-        : const ColorScheme.dark(
-            primary: Color(0xFF7B9CF0),
-            onPrimary: Colors.black,
-            surface: Color(0xFF0A0A0A),
-            onSurface: Color(0xFFF0EFEA),
-            outline: Color(0xFF242424),
-            onSurfaceVariant: Color(0xFF96938E),
-          );
+    // ColorScheme.light()/.dark() only let you override a few named slots;
+    // everything else (secondary, secondaryContainer, tertiary...) falls back
+    // to Material's own baked-in tones -- which is where a stray teal
+    // "selected" pill on SegmentedButton/Chip was coming from. fromSeed
+    // derives *all* of those from our own accent instead, then copyWith pins
+    // the exact tokens the design actually specifies.
+    final scheme = ColorScheme.fromSeed(seedColor: primary, brightness: brightness).copyWith(
+      primary: primary,
+      onPrimary: isLight ? Colors.white : Colors.black,
+      surface: isLight ? Colors.white : const Color(0xFF0A0A0A),
+      onSurface: isLight ? const Color(0xFF1C1B1A) : const Color(0xFFF0EFEA),
+      outline: isLight ? const Color(0xFFE7E3DB) : const Color(0xFF242424),
+      onSurfaceVariant: isLight ? const Color(0xFF7A756E) : const Color(0xFF96938E),
+    );
 
     final bg = isLight ? const Color(0xFFF4F3EE) : Colors.black;
 
@@ -61,8 +59,29 @@ class AppTheme {
         scrolledUnderElevation: 0,
       ),
       dividerColor: scheme.outline,
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          selectedBackgroundColor: scheme.surface,
+          selectedForegroundColor: scheme.onSurface,
+          foregroundColor: scheme.onSurfaceVariant,
+          side: BorderSide(color: scheme.outline),
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
     );
   }
+}
+
+/// Splash + FAB accent (validated against the HTML prototype's ".fab" and
+/// splash background gradients). Kept out of ColorScheme since it's a single
+/// fixed brand color, not something that should shift with the theme.
+class AppAccents {
+  AppAccents._();
+  static const Color fabGradientStart = Color(0xFFFFA25E);
+  static const Color fabGradientEnd = Color(0xFFE8620A);
 }
 
 /// Preset note background swatches ('default' follows the theme).

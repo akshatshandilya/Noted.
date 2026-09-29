@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/note_colors.dart';
 import '../../data/models/note.dart';
 import '../../providers/notes_provider.dart';
+import '../../widgets/drawing_canvas.dart';
 
 class NoteEditorScreen extends StatefulWidget {
   final Note note;
@@ -69,6 +71,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       n.title.trim().isEmpty &&
       n.content.trim().isEmpty &&
       n.tags.isEmpty &&
+      (n.drawingData == null || n.drawingData!.isEmpty) &&
       n.checklist.every((c) => c.text.trim().isEmpty);
 
   void _scheduleSave() {
@@ -209,6 +212,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final fg = tone != null ? kInkOnPastel : scheme.onSurface;
     final sub = tone != null ? kInkOnPastel.withOpacity(0.6) : scheme.onSurfaceVariant;
     final isChecklist = note.type == NoteType.checklist;
+    final isDrawing = note.type == NoteType.drawing;
     final inTrash = note.deleted;
 
     return Scaffold(
@@ -273,14 +277,41 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   ),
                   _tagRow(fg, sub),
                   const SizedBox(height: 8),
-                  if (isChecklist) _checklist(fg, sub, scheme, inTrash) else _contentField(fg, sub, inTrash),
+                  if (isDrawing)
+                    _drawing(inTrash)
+                  else if (isChecklist)
+                    _checklist(fg, sub, scheme, inTrash)
+                  else
+                    _contentField(fg, sub, inTrash),
                 ],
               ),
             ),
-            _bottomBar(fg, sub, isChecklist),
+            if (!isDrawing) _bottomBar(fg, sub, isChecklist),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _drawing(bool readOnly) {
+    if (readOnly) {
+      // Trash is read-only: show the saved sketch as a plain image instead
+      // of a live (editable) canvas.
+      final data = note.drawingData;
+      if (data == null || data.isEmpty) {
+        return const Padding(padding: EdgeInsets.only(top: 24), child: Text('Empty sketch'));
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.memory(base64Decode(data)),
+      );
+    }
+    return DrawingCanvas(
+      initialPng: note.drawingData,
+      onChanged: (png) {
+        note.drawingData = png;
+        _saveNow();
+      },
     );
   }
 
@@ -513,7 +544,7 @@ class _ChecklistRowState extends State<_ChecklistRow> {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(6),
                   color: done ? widget.accent : Colors.transparent,
                   border: Border.all(color: done ? widget.accent : widget.sub, width: 1.6),
                 ),
