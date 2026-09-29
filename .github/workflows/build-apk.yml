@@ -1,0 +1,79 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: # also lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write # needed to publish the APK to a Release
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate the Android project
+        run: flutter create --project-name noted --org com.noted --platforms=android .
+
+      - name: Remove the default template test (ours is test/notes_logic_test.dart)
+        run: rm -f test/widget_test.dart
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Apply Noted. Android configuration
+        run: bash tool/configure_android.sh
+
+      # Every CI run would otherwise sign with a brand-new random key, and
+      # Android refuses to update an app signed with a different key (you'd
+      # have to uninstall first, which deletes your notes). One fixed key
+      # makes every build an in-place update.
+      - name: Use the fixed signing key
+        run: |
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
+
+      - name: Analyze (informational)
+        continue-on-error: true
+        run: flutter analyze
+
+      - name: Test (informational)
+        continue-on-error: true
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Name the APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk Noted.apk
+
+      - name: Keep the APK as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noted-apk
+          path: Noted.apk
+
+      - name: Publish to the "latest" release (easy download from your phone)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Noted. (latest build)
+          body: Latest build of Noted. Download Noted.apk on your Android phone and open it to install.
+          prerelease: true
+          files: Noted.apk
