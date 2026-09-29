@@ -34,8 +34,8 @@ flutter:
 
 # Generate launcher icons with:  dart run flutter_launcher_icons
 flutter_launcher_icons:
-   android: true
-     ios: false
-     image_path: "assets/icon/app_icon.png"
-     adaptive_icon_background: "#F4F3EE"
-     adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#F4F3EE"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
